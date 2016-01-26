@@ -359,10 +359,6 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
         return super.onNestedPreFling(target, velocityX, velocityY);
     }
 
-    public void disableWhenHorizontalMove(boolean disable) {
-        mDisableWhenHorizontalMove = disable;
-    }
-
     public void setHeaderView(View header) {
         if (!(header instanceof Header)) {
             throw new IllegalStateException("header must implements HeaderImpl");
@@ -376,7 +372,6 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
             header.setLayoutParams(lp);
         }
         mHeaderView = header;
-        //mPullIndicator.setHeaderImpl((Header) mHeaderView);
         addView(header);
     }
 
