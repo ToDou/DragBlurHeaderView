@@ -1,16 +1,19 @@
 package com.loopeer.android.librarys.dragblurheader;
 
 import android.content.Context;
+import android.support.v4.view.NestedScrollingChild;
 import android.support.v4.view.NestedScrollingParent;
 import android.support.v4.view.ViewCompat;
+import android.support.v4.widget.ScrollerCompat;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.widget.Scroller;
 
-public class DragBlurHeaderView extends ViewGroup implements NestedScrollingParent {
+public class DragBlurHeaderView extends ViewGroup implements NestedScrollingParent, NestedScrollingChild {
 
     private View mHeaderView;
     private View mContent;
@@ -23,6 +26,11 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
     private boolean mHasSendCancelEvent = false;
     private int mDurationToGoBack = 300;
     private View mScrollTarget;
+
+    private int mTouchSlop;
+    private int mMinimumVelocity;
+    private int mMaximumVelocity;
+    private ScrollerCompat mScroller;
 
     public DragBlurHeaderView(Context context) {
         this(context, null);
@@ -40,6 +48,15 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
 
         final ViewConfiguration conf = ViewConfiguration.get(getContext());
         mPagingTouchSlop = conf.getScaledTouchSlop() * 2;
+        init();
+    }
+
+    private void init() {
+        mScroller = ScrollerCompat.create(getContext());
+        final ViewConfiguration configuration = ViewConfiguration.get(getContext());
+        mTouchSlop = configuration.getScaledTouchSlop();
+        mMinimumVelocity = configuration.getScaledMinimumFlingVelocity();
+        mMaximumVelocity = configuration.getScaledMaximumFlingVelocity();
     }
 
     @Override
@@ -59,17 +76,6 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
 
     private void createViews() {
         final int childCount = getChildCount();
-        int contentNumCount = 0;
-        /*for (int i = 0; i < childCount; i++) {
-            View view = getChildAt(i);
-            if (view instanceof Header) {
-                mHeaderView = view;
-                continue;
-            }
-            contentNumCount++;
-            mContent = view;
-        }*/
-
         if (childCount == 1) {
             mContent = getChildAt(0);
         }
@@ -82,19 +88,6 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
         if (mHeaderView == null) {
             createDefaultHeader();
         }
-
-       /* if (contentNumCount == 0) {
-            throw new IllegalStateException("PullSwitchView must have one content view");
-        } else if (contentNumCount > 1) {
-            throw new IllegalStateException("PullSwitchView can host only one direct child, " +
-                    "and the footer and header must implements FooterImpl or HeaderImpl");
-        }*/
-    }
-
-    @Override
-    public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
-        mScrollTarget = target;
-        return false;
     }
 
     private void createDefaultHeader() {
@@ -165,6 +158,10 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent e) {
+
+        VelocityTracker mVelocityTracker = VelocityTracker.obtain();
+        mVelocityTracker.addMovement(e);
+
         if (!isEnabled() || mContent == null || mHeaderView == null) {
             return dispatchTouchEventSupper(e);
         }
@@ -172,6 +169,15 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
         switch (action) {
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
+
+                // 初始化速率的单位
+                mVelocityTracker.computeCurrentVelocity(1000, 0.01f);
+                int velocityY = (int) mVelocityTracker.getYVelocity();
+                mScrollChecker.fling(0, velocityY);
+                // 回收
+                mVelocityTracker.recycle();
+
+
                 mPullIndicator.onRelease();
                 if (mPullIndicator.hasLeftStartPosition()) {
                     if (mPullIndicator.hasBelowStartPosition()) {
@@ -279,7 +285,10 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
     private void updateHeaderOffset(int change) {
         if (mPullIndicator.getHeaderCurrentPosY() >= 0) {
             mHeaderView.offsetTopAndBottom(0 - mPullIndicator.getHeaderLastPosY());
-            mPullIndicator.setHeaderCurrentPos(0);
+
+            ViewGroup.LayoutParams layoutParams = mHeaderView.getLayoutParams();
+            layoutParams.height = mPullIndicator.getHeaderHeight() + mPullIndicator.getCurrentPosY();
+            mHeaderView.setLayoutParams(layoutParams);
         } else {
             mHeaderView.offsetTopAndBottom(change);
         }
@@ -294,6 +303,60 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
         if (!mPullIndicator.isUnderTouch()) {
             mScrollChecker.tryToScrollTo(mPullIndicator.POS_START, mDurationToGoBack);
         }
+    }
+
+    @Override
+    public boolean onStartNestedScroll(View child, View target, int nestedScrollAxes) {
+        mScrollTarget = target;
+        return false;
+    }
+
+/*
+    @Override
+    public boolean onNestedFling(View target, float velocityX, float velocityY, boolean consumed) {
+        if (!consumed) {
+            flingWithNestedDispatch((int) velocityY);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean flingWithNestedDispatch(int velocityY) {
+        final boolean canFling = true;*//*(mHeaderController.canScrollUp() && velocityY > 0) ||
+                (mHeaderController.canScrollDown() && velocityY < 0)*//*;
+        if (!dispatchNestedPreFling(0, velocityY)) {
+            dispatchNestedFling(0, velocityY, canFling);
+            if (canFling) {
+                fling(velocityY);
+            }
+        }
+        return canFling;
+    }
+
+    public void fling(int velocityY) {
+//        mPullState = STATE_FLING;
+        mScroller.abortAnimation();
+        mScroller.fling(0, 10, 0, velocityY, 0, 0,
+                10, 40,
+                0, 0);
+        ViewCompat.postInvalidateOnAnimation(this);
+    }
+
+    @Override
+    public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
+        return flingWithNestedDispatch((int) velocityY);
+    }
+
+    */
+
+    @Override
+    public boolean onNestedFling(View target, float velocityX, float velocityY, boolean consumed) {
+        return super.onNestedFling(target, velocityX, velocityY, consumed);
+    }
+
+    @Override
+    public boolean onNestedPreFling(View target, float velocityX, float velocityY) {
+        return super.onNestedPreFling(target, velocityX, velocityY);
     }
 
     public void disableWhenHorizontalMove(boolean disable) {
@@ -439,6 +502,23 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
                 mScroller.forceFinished(true);
             }
             mScroller.startScroll(0, 0, 0, distance, duration);
+            post(this);
+            mIsRunning = true;
+        }
+
+
+        public void fling(int velocityX, int velocityY) {
+            //setScrollState(SCROLL_STATE_SETTLING);
+            //mLastFlingX = mLastFlingY = 0;
+            //mStart = mPullIndicator.getCurrentPosY();
+
+            mScroller.fling(0, 0, velocityX, velocityY,
+                    Integer.MIN_VALUE, Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE);
+            removeCallbacks(this);
+            mLastFlingY = 0;
+            if (!mScroller.isFinished()) {
+                mScroller.forceFinished(true);
+            }
             post(this);
             mIsRunning = true;
         }
