@@ -32,6 +32,8 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
     private int mMaximumVelocity;
     private ScrollerCompat mScroller;
 
+    private OnPosChangeListener mOnPosChangeListener;
+
     public DragBlurHeaderView(Context context) {
         this(context, null);
     }
@@ -289,10 +291,15 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
             ViewGroup.LayoutParams layoutParams = mHeaderView.getLayoutParams();
             layoutParams.height = mPullIndicator.getHeaderHeight() + mPullIndicator.getCurrentPosY();
             mHeaderView.setLayoutParams(layoutParams);
+            onHeaderSizeChange(mPullIndicator.getCurrentPosY());
         } else {
             mHeaderView.offsetTopAndBottom(change);
         }
 
+    }
+
+    private void onHeaderSizeChange(int currentPosY) {
+        if (mOnPosChangeListener != null) mOnPosChangeListener.onPosYChange(currentPosY);
     }
 
     private void applySwitchShowText() {
@@ -517,6 +524,14 @@ public class DragBlurHeaderView extends ViewGroup implements NestedScrollingPare
             post(this);
             mIsRunning = true;
         }
+    }
+
+    public void setOnPosChangeListener(OnPosChangeListener onPosChangeListener) {
+        mOnPosChangeListener = onPosChangeListener;
+    }
+
+    public interface OnPosChangeListener{
+        void onPosYChange(int y);
     }
 
 }

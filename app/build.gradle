@@ -10,6 +10,10 @@ android {
         targetSdkVersion 23
         versionCode 1
         versionName "1.0"
+
+
+        renderscriptTargetApi 20
+        renderscriptSupportModeEnabled true
     }
     buildTypes {
         release {
@@ -27,4 +31,7 @@ dependencies {
     compile 'com.android.support:recyclerview-v7:23.1.1'
     compile 'com.android.support:design:23.1.1'
     compile 'com.facebook.fresco:fresco:0.7.0'
+    compile 'jp.wasabeef:blurry:1.0.5'
+    compile 'com.squareup.okhttp:okhttp:2.6.0'
+    compile 'com.facebook.fresco:imagepipeline-okhttp:0.8.1'
 }
